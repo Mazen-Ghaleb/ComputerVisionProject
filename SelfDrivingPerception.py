@@ -4,14 +4,15 @@ import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 import glob
-import skimage
+import skimage.morphology
 
 #Function to show an Image in a figure
 def show_image(image, title='Image', cmap_type='gray'):
     plt.figure()
     plt.imshow(image, cmap = cmap_type)
     plt.title(title)
-
+    plt.show(block=True)
+    
 #Check if the Variable is empty , whether tuple or nparray
 def is_notEmpty(Variable):
     if(Variable is None):
@@ -575,33 +576,77 @@ def processVideos():
     #Method 2 --> Curve fitting Method
     #Method 3 --> Point fitting Method
     #Method 4 --> All Methods
-    method = 1
+    method = 4
 
     if (VideoFlag):
         video_paths = glob.glob("media/*.mp4")
         videos = [cv2.VideoCapture(video) for video in video_paths]
 
         for i in range(len(videos)):
-            numOfFrames = 2
+            numOfFrames = -1 # put -1 to do all the video
             startFrame = 0
-            frames, fps, frameCount = videoToFrames(videos[i],startFrame)    
+            frames, fps, frameCount = videoToFrames(videos[i],startFrame,numOfFrames)
+            
+            if (numOfFrames != -1):
+                frameCount = numOfFrames
+                
+            if (method == 4):
+                    framesM1 = np.copy(frames)
+                    framesM2 = np.copy(frames)
+                    framesM3 = np.copy(frames)
+            else:
+                    newframes = np.copy(frames)
+            
             plt.rcParams['figure.max_open_warning'] = fps * 3
             # Uncomment Below to Show all frames in the range
             #         for j, frame in enumerate(frames):
             #             show_image(frame,"Video "+ str(i+1) + " Frame "+ str(j+1+startFrame))
-        
+            
             # Do the pipeline operation on each frame
             for j, frame in enumerate(frames):
                 Result = pipeline(frames[j],method,debugger)
-                if (is_notEmpty(Result)):
-                    frames[j] = Result
-                    print("Output Video",(i+1),": The frame", str(j+1),"out of ", (frameCount+1),"is done processing")
-                else:
-                    print("Output Video",(i+1),": The frame",(j+1),"has error in detecting lane")
-                    frames[j] = frames[j-1]
-        
-            # Combine the frames
-            makeVideo(frames,fps,"Output Video "+str(i+1))
+                if (method ==4):
+                    if (is_notEmpty(Result)):
+                        framesM1[j] = Result[0]
+                        framesM2[j] = Result[1]
+                        framesM3[j] = Result[2]
+                        print("Output Video",(i+1),": The frame", str(j+1),"out of ", (frameCount),"is done processing")
+                    else:
+                        print("Output Video",(i+1),": The frame",(j+1),"has error in detecting lane")
+                        if (j != 0):
+                            framesM1[j] = framesM1[j-1]
+                            framesM2[j] = framesM2[j-1]
+                            framesM3[j] = framesM3[j-1]
+                else:    
+                    if (is_notEmpty(Result)):
+                        newframes[j] = Result
+                        print("Output Video",(i+1),": The frame", (j+1),"out of", (frameCount),"is done processing")
+                    else:
+                        print("Output Video",(i+1),": The frame",(j+1),"out of",(frameCount),"has error in detecting lane")
+                        if (j != 0):
+                            newframes[j] = newframes[j-1]
+            
+            # Combine the frames       
+            if (method ==4):
+                    if (is_notEmpty(framesM1)):
+                        makeVideo(framesM1,fps,"Output Video "+str(i+1)+" (Line fitting Method)")
+                    else:
+                        print("Output Video "+str(i+1)+" (Line fitting Method) has failed in processing")
+                    
+                    if (is_notEmpty(framesM2)):
+                        makeVideo(framesM2,fps,"Output Video "+str(i+1)+" (Curve fitting Method)")
+                    else:
+                        print("Output Video "+str(i+1)+" (Curve fitting Method) has failed in processing")
+                        
+                    if (is_notEmpty(framesM3)):
+                        makeVideo(framesM3,fps,"Output Video "+str(i+1)+" (Point fitting Method)")
+                    else:
+                        print("Output Video "+str(i+1)+" (Point fitting Method) has failed in processing")
+            else:     
+                    if (is_notEmpty(newframes)):
+                        makeVideo(newframes,fps,"Output Video "+str(i+1))
+                    else:
+                        print("Output Video "+str(i+1)+" has failed in processing")
 
 def startProcessing():
     processImages()
