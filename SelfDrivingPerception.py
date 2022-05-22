@@ -671,10 +671,9 @@ def processImages():
     print("The pipeline through all images took {} seconds".format(round(time.time()- start_t, 2)))
 
 def processVideos():
-    VideoFlag = False # True -- > Need Video Processing
+    VideoFlag = True # True -- > Need Video Processing
     debugger = False
     start_t = time.time()
-
 
     # Choosing the method
     #Method 1 --> Line fitting Method
@@ -782,79 +781,6 @@ def startProcessing():
     processImages()
     processVideos()
 
-# import sys
-# import numba 
-# import numpy
-
-# print("Python version:", sys.version)
-# print("Numba version:", numba.__version__)
-# print("Numpy version:", numpy.__version__)
-
-# from numba import cuda
-# import numpy as np
-# @cuda.jit
-
-# #gridsize = 1
-# #blocksize = Number of frames 
-
-
-# def cudakernel0(array):
-#     for i in range(array.size):
-#         array[i] += 0.5
-# array = np.array([0, 1], np.float32)
-# print('Initial array:', array)
-
-# print('Kernel launch: cudakernel0[1, 1](array)')
-# cudakernel0[1, 1](array)
-
-# print('Updated array:',array)
-
-# array = np.array([0, 1], np.float32)
-# print('Initial array:', array)
-
-# gridsize = 1024
-# blocksize = 1024
-# print("Grid size: {}, Block size: {}".format(gridsize, blocksize))
-
-# print("Total number of threads:", gridsize * blocksize)
-
-# print('Kernel launch: cudakernel0[gridsize, blocksize](array)')
-# cudakernel0[gridsize, blocksize](array)
-
-# print('Updated array:',array)
-
-# @cuda.jit
-# def cudakernel1(array):
-#     thread_position = cuda.grid(1)
-#     array[thread_position] += 0.5
-
-# array = np.array([0, 1], np.float32)
-# print('Initial array:', array)
-
-# print('Kernel launch: cudakernel1[1, 2](array)')
-# cudakernel1[1, 2](array)
-
-# print('Updated array:',array)
-
-# array = np.array([0, 1], np.float32)
-# print('Initial array:', array)
-
-# print('Kernel launch: cudakernel1[1, 1](array)')
-# cudakernel1[1, 1](array)
-
-# print('Updated array:',array)
-
-# array = np.zeros(1024 * 1024, np.float32)
-# print('Initial array:', array)
-
-# print('Kernel launch: cudakernel1[1024, 1024](array)')
-# cudakernel1[1024, 1024](array)
-
-# print('Updated array:', array)
-
-# # Since it is a huge array, let's check that the result is correct:
-# print('The result is correct:', np.all(array == np.zeros(1024 * 1024, np.float32) + 0.5))
-
-##startProcessing()
+startProcessing()
 
 # %%
