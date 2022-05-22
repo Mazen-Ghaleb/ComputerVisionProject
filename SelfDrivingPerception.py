@@ -2,9 +2,11 @@
 
 import cv2
 from matplotlib import pyplot as plt
+import time
+import os
 import numpy as np
 import glob
-import skimage.morphology
+import skimage
 
 #Function to show an Image in a figure
 def show_image(image, title='Image', cmap_type='gray'):
@@ -15,10 +17,21 @@ def show_image(image, title='Image', cmap_type='gray'):
     
 #Check if the Variable is empty , whether tuple or nparray
 def is_notEmpty(Variable):
-    if(Variable is None):
-        return False
-    else:
-        return True
+    if (type(Variable) == tuple): 
+        if(Variable is None):
+            return False
+        else:
+            return True
+    elif (type(Variable) == list):
+        if(Variable):
+            return True
+        else:
+            return False
+    elif (type(Variable) == np.ndarray):
+        if (Variable.size > 0):
+            return True
+        else:
+            return False
 
 #Prints all the np array exceeding the limit
 def print_all(arr):
@@ -305,17 +318,91 @@ def getMedianHeightfilter(Points,xPoints,yPoints,numPoints):
     return newPoints,newxPoints,newyPoints
 
 #Calculates Radius of Curvature
-def getRadiusofCurvature(PolynomialFit):
+def getRadiusofCurvature(PolynomialFit, x):
     # Radius of curvature = ((1+ (dy/dx)**2)**(3/2))/(abs.(dy2/dx2))
     firstDegree=np.polyder(PolynomialFit,1)
     SecondDegree=np.polyder(PolynomialFit,2)
     
-    # Assumption : We calculate Radius from the peak of parbola
-    # x = -b / 2a
-    x = (-PolynomialFit[1])/ (2*PolynomialFit[0])
+    # Assumption : We calculate Radius from the starting point x
     return ((1+ (np.polyval(firstDegree,x))**2)**(3/2))/(np.abs(np.polyval(SecondDegree,x)))
 
-def pipeline(image,method=2,debugger = False):
+def getCarDetection(Oldimage, debugger = False):
+    image = np.copy(Oldimage)
+    weights_path = os.path.join("Yolo","yolov3.weights")
+    config_path = os.path.join("Yolo","yolov3.cfg")
+    labels_path = os.path.join("Yolo","coco.names")
+    if (debugger):
+        print("Loaded Yolo dataset")
+        
+    # confidence threshold
+    Score_threshold = 0.85
+    # nms threshold
+    nms_threshold = 0.70
+    # forms the neural network
+    net = cv2.dnn.readNetFromDarknet(config_path, weights_path)
+    if (debugger):
+        print("Neural Network: ",net)
+        
+    # Gets layers 82 ,94 and 106 in Yolo
+    names= net.getLayerNames()
+    (H,W) =image.shape[:2]
+    layers_names = [names[i - 1] for i in net.getUnconnectedOutLayers()]
+    if (debugger):
+        print("Obtained Layers : ", layers_names)
+    
+    # Run the inference on the frame or image
+    blob = cv2.dnn.blobFromImage(image, 1/255.0, (416,416), crop=False, swapRB = False)
+    net.setInput(blob)
+    if (debugger):
+        print("Applying inference")
+    
+    start_t = time.time()
+    layers_output =net.forward(layers_names)
+    if (debugger):
+        print("A forward path through yolov3 took {}".format(time.time()- start_t))
+    
+    boxes = []
+    confidences = []
+    classIDs = []
+    
+    for output in layers_output:
+        for detection in output:
+            scores = detection[5:]
+            classID = np.argmax(scores)
+            confidence = scores[classID]
+            
+                
+            if (confidence > Score_threshold):
+                box = detection[:4] * np.array([W, H, W, H])
+                bx, by, bw, bh = box.astype('int')
+                
+                x = int(bx - (bw/2))
+                y = int(by - (bh/2))
+                
+                boxes.append([x, y, int(bw),int(bh)])
+                confidences.append(float(confidence))
+                classIDs.append(classID)
+                
+    if (debugger):
+                print("Confidences obtained",confidences)
+            
+    if (is_notEmpty(confidences)):
+        idxs = cv2.dnn.NMSBoxes(boxes, confidences, Score_threshold, nms_threshold)
+
+        labels = open(labels_path).read().strip().split("\n")
+
+        for i in idxs.flatten():
+            (x, y) = [boxes[i][0], boxes[i][1]]
+            (w, h) = [boxes[i][2], boxes[i][3]]
+            
+            color = (0, 255, 255)
+            cv2.rectangle(image, (x,y), (x + w, y + h), color, 2)
+            if (w > 50): # Car not too far (width so small)
+                cv2.putText(image, "{}: {}%".format(labels[classIDs[i]], int(confidences[i]*100)), (x, y - 5), \
+                cv2.FONT_HERSHEY_SIMPLEX, w/130, color, 2)
+    return image
+
+def getLaneDetection(image, detectionImage, method=2, debugger = False, UsesGray = False):
     #Method 1 --> Line fitting Method
     #Method 2 --> Curve fitting Method
     #Method 3 --> Point fitting Method
@@ -334,17 +421,26 @@ def pipeline(image,method=2,debugger = False):
         show_image(blur_img,"Gaissian Blur")
     
     # Converts the image from RGB to HLS color
-    hls_img = cv2.cvtColor(blur_img, cv2.COLOR_RGB2HLS)
-    if (debugger):
-        show_image(hls_img,"HSL Image")
-    
-    # Gets S channel from HLS
-    s_channel = hls_img[:, :, 2]
-    if (debugger):
-        show_image(s_channel,"S Channel")
-    
-    # Applys Canny Edge detection on S channel
-    canny_img = canny(s_channel)
+    if (UsesGray):
+        gray_img = cv2.cvtColor(blur_img, cv2.COLOR_RGB2GRAY)
+        if (debugger):
+            show_image(gray_img,"Gray Image")
+            
+        # Applys Canny Edge detection on Gray Image
+        canny_img = canny(gray_img)
+    else:
+        hls_img = cv2.cvtColor(blur_img, cv2.COLOR_RGB2HLS)
+        if (debugger):
+            show_image(hls_img,"HSL Image")
+
+        # Gets S channel from HLS
+        s_channel = hls_img[:, :, 2]
+        if (debugger):
+            show_image(s_channel,"S Channel")
+            
+        # Applys Canny Edge detection on S channel
+        canny_img = canny(s_channel)
+        
     if (debugger):
         show_image(canny_img, "Canny Image")
     
@@ -371,7 +467,7 @@ def pipeline(image,method=2,debugger = False):
     
     ## If slope = 0 or points on same line ---> dividing over 0
     if (((Points[0][0] - Points[2][0]) == 0) or ((Points[1][0] - Points[3][0]) == 0)
-        or ((Points[0][1] - Points[2][1]) == 0) or ((Points[1][1] - Points[3][1]) == 0)):
+        or ((Points[0][1] - Points[2][1]) == 0) or ((Points[1][1] - Points[3][1]) == 0) or UsesGray):
         NeedHorizontalMedian = False # No need for horizontal median after Openning
         OpenningMorph = skimage.morphology.diameter_opening(sx_binary,24,1) #Does Openning Morph to eliminate noise
         if (debugger):
@@ -402,7 +498,7 @@ def pipeline(image,method=2,debugger = False):
         show_image(LanesDrawn,"Polygon Filled from Lines")
     
     # Combines the filled polygon and lines with the Frame or Image 
-    combine = cv2.addWeighted(image,0.8, LanesDrawn, 1,1)
+    combine = cv2.addWeighted(detectionImage,0.8, LanesDrawn, 1,1)
     if (debugger):
         show_image(LanesDrawn,"Combined Line Filling")
     
@@ -462,7 +558,7 @@ def pipeline(image,method=2,debugger = False):
         show_image(LanesDrawn2,"Polygon Filled from Curved Lines")
     
     # Combines the filled polygon and curved lines with the Frame or Image 
-    combine2 = cv2.addWeighted(image,0.8, LanesDrawn2, 1,1)
+    combine2 = cv2.addWeighted(detectionImage,0.8, LanesDrawn2, 1,1)
     
     # Checks if needs to do Point fitting
     if (method==3 or method ==4):
@@ -483,7 +579,7 @@ def pipeline(image,method=2,debugger = False):
             show_image(LanesDrawn3)
         
         # Combines the filled polygon and point filled lines with the Frame or Image
-        combine3 = cv2.addWeighted(image,1, LanesDrawn3, 1,1)
+        combine3 = cv2.addWeighted(detectionImage,1, LanesDrawn3, 1,1)
         if (debugger):
             show_image(combine3)
     
@@ -491,8 +587,8 @@ def pipeline(image,method=2,debugger = False):
         show_image(combine2,"Combined Curve Filling")
     
     # Calculates Radius of Curvature using the Curve produced by Curve fitting
-    RadiusLeft = round(getRadiusofCurvature(LeftPolynomial),2)
-    RadiusRight = round(getRadiusofCurvature(RightPolynomial),2)
+    RadiusLeft = round(getRadiusofCurvature(LeftPolynomial, AdjustedPoints[0][0]), 2)
+    RadiusRight = round(getRadiusofCurvature(RightPolynomial, AdjustedPoints[3][0]), 2)
     
     # Intializes Radius of Curvature to the highest of the left or right radius
     RadiusHighest = round(max(RadiusLeft,RadiusRight)/1000,2)
@@ -532,6 +628,8 @@ def pipeline(image,method=2,debugger = False):
 
 def processImages():
     debugger = False
+    start_t = time.time()
+
     # Reading All images in the folder
     images_paths = glob.glob("media/test_images/*.jpg")
     images = [plt.imread(image) for image in images_paths]
@@ -551,7 +649,10 @@ def processImages():
 
     for image_idx in range(len(images)):
         show_image(images[image_idx], "Image "+str(image_idx +1))
-        Result = pipeline(images[image_idx],method,debugger)
+        DetectionImage = getCarDetection(images[image_idx], debugger)
+        #show_image(DetectionImage)
+
+        Result = getLaneDetection(images[image_idx],DetectionImage,method,debugger)
         # Checks if something is returned
         if (is_notEmpty(Result)):
             if (method == 1):
@@ -567,9 +668,13 @@ def processImages():
         else: # Nothing is returned
             print("The image has error in detecting lane")
 
+    print("The pipeline through all images took {} seconds".format(round(time.time()- start_t, 2)))
+
 def processVideos():
-    VideoFlag = True # True -- > Need Video Processing
+    VideoFlag = False # True -- > Need Video Processing
     debugger = False
+    start_t = time.time()
+
 
     # Choosing the method
     #Method 1 --> Line fitting Method
@@ -601,30 +706,53 @@ def processVideos():
             # Uncomment Below to Show all frames in the range
             #         for j, frame in enumerate(frames):
             #             show_image(frame,"Video "+ str(i+1) + " Frame "+ str(j+1+startFrame))
-            
+            lastframeFailed = False
             # Do the pipeline operation on each frame
             for j, frame in enumerate(frames):
-                Result = pipeline(frames[j],method,debugger)
+                DetectionFrame = getCarDetection(frames[j], debugger)
+                Result = getLaneDetection(frames[j],DetectionFrame,method,debugger)
                 if (method ==4):
                     if (is_notEmpty(Result)):
+                        lastframeFailed = False
                         framesM1[j] = Result[0]
                         framesM2[j] = Result[1]
                         framesM3[j] = Result[2]
-                        print("Output Video",(i+1),": The frame", str(j+1),"out of ", (frameCount),"is done processing")
+                        print("Output Video",(i+1),": The frame",(j+1),"out of ", (frameCount),"is done processing")
                     else:
-                        print("Output Video",(i+1),": The frame",(j+1),"has error in detecting lane")
-                        if (j != 0):
-                            framesM1[j] = framesM1[j-1]
-                            framesM2[j] = framesM2[j-1]
-                            framesM3[j] = framesM3[j-1]
+                        Result = getLaneDetection(frames[j],DetectionFrame,method,debugger,True)
+                        if(is_notEmpty(Result)):
+                            framesM1[j] = Result[0]
+                            framesM2[j] = Result[1]
+                            framesM3[j] = Result[2]
+                            print("Output Video",(i+1),": The frame",(j+1),"out of ", (frameCount),"is done processing")
+                        else:
+                            if (j == 0 or lastframeFailed):
+                                framesM1[j] = DetectionFrame
+                                framesM2[j] = DetectionFrame
+                                framesM3[j] = DetectionFrame
+                            else:
+                                lastframeFailed = True
+                                framesM1[j] = framesM1[j-1]
+                                framesM2[j] = framesM2[j-1]
+                                framesM3[j] = framesM3[j-1]
+                            print("Output Video",(i+1),": The frame",(j+1),"has error in detecting lane")
                 else:    
                     if (is_notEmpty(Result)):
+                        lastframeFailed = False
                         newframes[j] = Result
                         print("Output Video",(i+1),": The frame", (j+1),"out of", (frameCount),"is done processing")
                     else:
-                        print("Output Video",(i+1),": The frame",(j+1),"out of",(frameCount),"has error in detecting lane")
-                        if (j != 0):
-                            newframes[j] = newframes[j-1]
+                        Result = getLaneDetection(frames[j],DetectionFrame,method,debugger,True)
+                        if(is_notEmpty(Result)):
+                            newframes[j] = Result
+                            print("Output Video",(i+1),": The frame",(j+1),"out of ", (frameCount),"is done processing")
+                        else:
+                            if (j == 0 or lastframeFailed):
+                                newframes[j] = DetectionFrame
+                            else:
+                                lastframeFailed = True
+                                newframes[j] = newframes[j-1]
+                            print("Output Video",(i+1),": The frame",(j+1),"out of",(frameCount),"has error in detecting lane")
             
             # Combine the frames       
             if (method ==4):
@@ -647,11 +775,86 @@ def processVideos():
                         makeVideo(newframes,fps,"Output Video "+str(i+1))
                     else:
                         print("Output Video "+str(i+1)+" has failed in processing")
+                        
+    print("The pipeline through all videos took {} seconds".format(round(time.time()- start_t, 2)))
 
 def startProcessing():
     processImages()
     processVideos()
 
-startProcessing()
+# import sys
+# import numba 
+# import numpy
+
+# print("Python version:", sys.version)
+# print("Numba version:", numba.__version__)
+# print("Numpy version:", numpy.__version__)
+
+# from numba import cuda
+# import numpy as np
+# @cuda.jit
+
+# #gridsize = 1
+# #blocksize = Number of frames 
+
+
+# def cudakernel0(array):
+#     for i in range(array.size):
+#         array[i] += 0.5
+# array = np.array([0, 1], np.float32)
+# print('Initial array:', array)
+
+# print('Kernel launch: cudakernel0[1, 1](array)')
+# cudakernel0[1, 1](array)
+
+# print('Updated array:',array)
+
+# array = np.array([0, 1], np.float32)
+# print('Initial array:', array)
+
+# gridsize = 1024
+# blocksize = 1024
+# print("Grid size: {}, Block size: {}".format(gridsize, blocksize))
+
+# print("Total number of threads:", gridsize * blocksize)
+
+# print('Kernel launch: cudakernel0[gridsize, blocksize](array)')
+# cudakernel0[gridsize, blocksize](array)
+
+# print('Updated array:',array)
+
+# @cuda.jit
+# def cudakernel1(array):
+#     thread_position = cuda.grid(1)
+#     array[thread_position] += 0.5
+
+# array = np.array([0, 1], np.float32)
+# print('Initial array:', array)
+
+# print('Kernel launch: cudakernel1[1, 2](array)')
+# cudakernel1[1, 2](array)
+
+# print('Updated array:',array)
+
+# array = np.array([0, 1], np.float32)
+# print('Initial array:', array)
+
+# print('Kernel launch: cudakernel1[1, 1](array)')
+# cudakernel1[1, 1](array)
+
+# print('Updated array:',array)
+
+# array = np.zeros(1024 * 1024, np.float32)
+# print('Initial array:', array)
+
+# print('Kernel launch: cudakernel1[1024, 1024](array)')
+# cudakernel1[1024, 1024](array)
+
+# print('Updated array:', array)
+
+# # Since it is a huge array, let's check that the result is correct:
+# print('The result is correct:', np.all(array == np.zeros(1024 * 1024, np.float32) + 0.5))
+
+##startProcessing()
 
 # %%
