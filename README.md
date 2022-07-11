@@ -1,14 +1,8 @@
 # Simple Perception Stack for Self-Driving Cars
 
 ### How to enable debugger:
-<<<<<<< Updated upstream
- &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Change the value of debugger to true
- 
-## Phase 1 - Lane Detection
-=======
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Change the value of debugger to true
->>>>>>> Stashed changes
 
 ### Methods to choose from:
 
@@ -17,17 +11,12 @@
 3. Point fitting Method
 4. All Methods
 
-## Phase 2 - Car Detection
- Car detection using Yolov3 with weights trained for coco names
-
 ### How to run:
 
 1. Run the Shell
-2. Run the Python File in Vcode or any IDE
+2. Run the Python File in VScode or any IDE
 3. Run through the Jupyter notebook
 
-<<<<<<< Updated upstream
-=======
 # Description
 
 The pipeline was divided into two major phases : Lane Detectetion and Object Detection (Example: Cars)
@@ -95,4 +84,3 @@ Original Image
 | ![](./media/read_me/Samples/Image%206.png) | ![](./media/read_me/Samples/Image%206%20-%20Line%20Method.png) | ![](./media/read_me/Samples/Image%206%20-%20Curve%20Method.png) | ![](./media/read_me/Samples/Image%206%20-%20Point%20Method.png) |
 | ![](./media/read_me/Samples/Image%207.png) | ![](./media/read_me/Samples/Image%207%20-%20Line%20Method.png) | ![](./media/read_me/Samples/Image%207%20-%20Curve%20Method.png) | ![](./media/read_me/Samples/Image%207%20-%20Point%20Method.png) |
 | ![](./media/read_me/Samples/Image%208.png) | ![](./media/read_me/Samples/Image%208%20-%20Line%20Method.png) | ![](./media/read_me/Samples/Image%208%20-%20Curve%20Method.png) | ![](./media/read_me/Samples/Image%208%20-%20Point%20Method.png) |
->>>>>>> Stashed changes
