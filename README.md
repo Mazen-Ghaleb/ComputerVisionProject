@@ -19,7 +19,7 @@
 
 # Description
 
-This project aim was to develop Simple Perception Stack for Self-Driving Cars by using Computer Vision techniques and was divided into two major phases : Lane Detectetion and Object Detection (Example: Cars)
+This project develops Simple Perception Stack for Self-Driving Cars by using Computer Vision techniques and was divided into two major phases : Lane Detection and Object Detection (Example: Cars)
 
 ## a) Object Detection
 
